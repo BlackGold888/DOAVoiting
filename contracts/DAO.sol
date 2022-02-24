@@ -10,6 +10,7 @@ contract DAO {
 
     address public chairPerson;
     address public voteToken;
+    address public myToken;
     uint256 public minimumQuorum;
     uint256 public voitingTimeEnd;
 
@@ -19,6 +20,7 @@ contract DAO {
         uint256 votesAgainst;
         uint256 quorumBalance;
         uint256 countUsersVoite;
+        uint256 startTime;
         bool isActive;
         address recipient;
     }
@@ -28,11 +30,17 @@ contract DAO {
 
     enum VoteType { VOTEFOR, VOTEAGAINST }
 
-    constructor(address _chairPerson, address _voteToken, uint256 _minimumQuorum, uint256 _voitingTimeEnd) {
+    modifier onlyChairPerson(){
+        require(msg.sender == chairPerson, "You don't have permision");
+        _;
+    }
+
+    constructor(address _chairPerson, address _voteToken, uint256 _minimumQuorum, uint256 _voitingTimeEnd, address _myToken) {
         chairPerson = _chairPerson;
         voteToken = _voteToken;
         minimumQuorum = _minimumQuorum;
         voitingTimeEnd = _voitingTimeEnd;
+        myToken = _myToken;
     }
 
     function deposit(uint256 _amount)external virtual {
@@ -40,10 +48,10 @@ contract DAO {
         usersDeposite[msg.sender] += _amount;
     }
 
-    function addProposal(address _recipient)external virtual{
+    function addProposal(address _recipient)external virtual onlyChairPerson{
         uint256 proposalId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
-        proposals[proposalId] = Proposal(proposalId, 0, 0, 0, 0, true, _recipient);
+        proposals[proposalId] = Proposal(proposalId, 0, 0, 0, 0, block.timestamp, true, _recipient);
     }
 
     function vote(uint256 _id, uint256 _amount, bool _voteType)external virtual {
@@ -65,10 +73,15 @@ contract DAO {
         proposals[_id].quorumBalance += _amount;
     }
 
-    function finishProposal(uint256 _id) external virtual {
+    function finishProposal(uint256 _id, bytes memory _data) external virtual payable returns(bool, bytes memory){
         require(proposals[_id].isActive == true, "Proposal is not active");
         require(proposals[_id].quorumBalance >= minimumQuorum, "Quorum not enaught");
-        uint256 _votesFor = (minimumQuorum * 51) / 100;
-        require(proposals[_id].votesFor >= _votesFor, "For finish you need more 50% vote for");
+        uint256 _votesFor = (proposals[_id].countUsersVoite * 51) / 100;
+        require(proposals[_id].votesFor >= _votesFor, "For finish you need more 51% vote for");
+        uint256 timeLeft = block.timestamp - proposals[_id].startTime;
+        require(timeLeft > voitingTimeEnd, "Voting time has not ended");
+        delete proposals[_id];
+        (bool success, bytes memory data) = myToken.call{value: msg.value, gas: 5000}(_data);
+        return (success, data);
     }
 }
