@@ -10,7 +10,6 @@ contract DAO {
 
     address public chairPerson;
     address public voteToken;
-    address public myToken;
     uint256 public minimumQuorum;
     uint256 public voitingTimeEnd;
 
@@ -35,17 +34,16 @@ contract DAO {
         _;
     }
 
-    constructor(address _chairPerson, address _voteToken, uint256 _minimumQuorum, uint256 _voitingTimeEnd, address _myToken) {
+    constructor(address _chairPerson, address _voteToken, uint256 _minimumQuorum, uint256 _voitingTimeEnd) {
         chairPerson = _chairPerson;
         voteToken = _voteToken;
         minimumQuorum = _minimumQuorum;
         voitingTimeEnd = _voitingTimeEnd;
-        myToken = _myToken;
     }
 
-    function deposit(uint256 _amount)external virtual {
-        MyToken(voteToken).mint(msg.sender, _amount);
-        usersDeposite[msg.sender] += _amount;
+    function deposit(address _to, uint256 _amount)external virtual {
+        MyToken(voteToken).mint(_to, _amount);
+        usersDeposite[_to] += _amount;
     }
 
     function addProposal(address _recipient)external virtual onlyChairPerson{
@@ -81,7 +79,7 @@ contract DAO {
         uint256 timeLeft = block.timestamp - proposals[_id].startTime;
         require(timeLeft > voitingTimeEnd, "Voting time has not ended");
         delete proposals[_id];
-        (bool success, bytes memory data) = myToken.call{value: msg.value, gas: 5000}(_data);
+        (bool success, bytes memory data) = voteToken.call{value: msg.value, gas: 5000}(_data);
         return (success, data);
     }
 }
